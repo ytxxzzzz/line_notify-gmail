@@ -17,8 +17,15 @@
   },
   "homepage": "https://github.com/ytxxzzzz/line_notify-gmail#readme",
   "devDependencies": {
+    "@types/gapi": "0.0.39",
+    "@types/gapi.auth2": "0.0.50",
+    "@types/gapi.client": "^1.0.1",
+    "@types/gapi.client.gmail": "^1.0.1",
     "@types/node": "^12.6.8",
     "tslint": "^5.18.0",
     "typescript": "^3.5.3"
+  },
+  "dependencies": {
+    "googleapis": "^39.2.0"
   }
 }
