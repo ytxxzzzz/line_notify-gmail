@@ -29,16 +29,6 @@ export async function listLabelsWithLogin(credentialFilePath: string, tokenFileP
   listLabels(oAuth2Client);
 }
 
-async function getOAuth2ClientFromCredentialFile(credentialFilePath: string) {
-  const credentialContent = await promisify(fs.readFile)(credentialFilePath);
-  const credentials = JSON.parse(credentialContent.toString());
-
-  const {client_secret, client_id, redirect_uris} = credentials.installed;
-  return new google.auth.OAuth2(
-    client_id, client_secret, redirect_uris[0]
-  );
-}
-
 export async function saveTokenFileWithCredentialFile(credentialFilePath: string, tokenFilePath: string) {
   const oAuth2Client = await getOAuth2ClientFromCredentialFile(credentialFilePath);
   const authUrl = oAuth2Client.generateAuthUrl({
@@ -64,6 +54,15 @@ export async function saveTokenFileWithCredentialFile(credentialFilePath: string
   });
 }
 
+async function getOAuth2ClientFromCredentialFile(credentialFilePath: string) {
+  const credentialContent = await promisify(fs.readFile)(credentialFilePath);
+  const credentials = JSON.parse(credentialContent.toString());
+
+  const {client_secret, client_id, redirect_uris} = credentials.installed;
+  return new google.auth.OAuth2(
+    client_id, client_secret, redirect_uris[0]
+  );
+}
 
 function listLabels(auth: any) {
     const gmail = google.gmail({version: 'v1', auth});
