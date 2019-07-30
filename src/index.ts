@@ -2,9 +2,11 @@
 import {google} from 'googleapis'
 import * as fs from 'fs';
 import * as readline from 'readline';
+import {promisify} from 'util';
 
 const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly'
 const TOKEN_PATH = 'token.json';
+const CREDENTIAL_PATH = 'client_id.json';
 
 /**
  * Triggered from a message on a Cloud Pub/Sub topic.
@@ -14,47 +16,38 @@ const TOKEN_PATH = 'token.json';
  */
 export async function helloPubSub(event: any, context: any) {
     console.log(`event=${JSON.stringify(event)}`);
-    const pubsubMessage = event.data;
-    console.log(`pubsubMsg=${Buffer.from(pubsubMessage, 'base64').toString()}`);
+    const pubsubMsgBase64 = event.data;
+    const pubsubMsg = Buffer.from(pubsubMsgBase64, 'base64').toString();
+    console.log(`pubsubMsg=${pubsubMsg}`);
 
-    fs.readFile('client_id.json', (err, content) => {
-        if (err) return console.log('Error loading client secret file:', err);
-        // Authorize a client with credentials, then call the Gmail API.
-        authorize(JSON.parse(content.toString()), listLabels);
-    })
-
-/*
-    console.log(process.env);
-    const client = new google.auth.OAuth2(process.env.gmail_client_id, process.env.gmail_client_secret);
-
-    const gmail = google.gmail({version: "v1", auth: client});
-    const response = await gmail.users.labels.list({userId: "me"});
-    console.log(client);
-    console.log("aaaaaaa");
-*/
 }
 
-function authorize(credentials: any, callback: Function) {
+export async function listLabelsWithLogin(credentialFilePath: string, tokenFilePath: string) {
+  const oAuth2Client = await getOAuth2ClientFromCredentialFile(credentialFilePath);
+  const token = await promisify(fs.readFile)(tokenFilePath);
+  oAuth2Client.setCredentials(JSON.parse(token.toString()));
+  listLabels(oAuth2Client);
+}
+
+async function getOAuth2ClientFromCredentialFile(credentialFilePath: string) {
+  const credentialContent = await promisify(fs.readFile)(credentialFilePath);
+  const credentials = JSON.parse(credentialContent.toString());
+
   const {client_secret, client_id, redirect_uris} = credentials.installed;
-  const oAuth2Client = new google.auth.OAuth2(
-      client_id, client_secret, redirect_uris[0]);
-
-  // Check if we have previously stored a token.
-  fs.readFile(TOKEN_PATH, (err, token) => {
-    if (err) return getNewToken(oAuth2Client, callback);
-    oAuth2Client.setCredentials(JSON.parse(token.toString()));
-    callback(oAuth2Client);
-  });
+  return new google.auth.OAuth2(
+    client_id, client_secret, redirect_uris[0]
+  );
 }
 
-function getNewToken(oAuth2Client: any, callback: Function) {
+export async function saveTokenFileWithCredentialFile(credentialFilePath: string, tokenFilePath: string) {
+  const oAuth2Client = await getOAuth2ClientFromCredentialFile(credentialFilePath);
   const authUrl = oAuth2Client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
   });
   console.log('Authorize this app by visiting this url:', authUrl);
   const rl = readline.createInterface({
-    input: process.openStdin(),
+    input: process.stdin,
     output: process.stdout,
   });
   rl.question('Enter the code from that page here: ', (code) => {
@@ -63,14 +56,14 @@ function getNewToken(oAuth2Client: any, callback: Function) {
       if (err) return console.error('Error retrieving access token', err);
       oAuth2Client.setCredentials(token);
       // Store the token to disk for later program executions
-      fs.writeFile(TOKEN_PATH, JSON.stringify(token), (err) => {
+      fs.writeFile(tokenFilePath, JSON.stringify(token), (err) => {
         if (err) return console.error(err);
-        console.log('Token stored to', TOKEN_PATH);
+        console.log('Token stored to', tokenFilePath);
       });
-      callback(oAuth2Client);
     });
   });
 }
+
 
 function listLabels(auth: any) {
     const gmail = google.gmail({version: 'v1', auth});
@@ -98,4 +91,10 @@ const testMessage = {
     "data":"eyJlbWFpbEFkZHJlc3MiOiJmcmVzaC5icmFzaC5zYXJhcmlpbWFuQGdtYWlsLmNvbSIsImhpc3RvcnlJZCI6MjAyODAzN30="
 }
 
-helloPubSub(testMessage, null);
+
+
+// クライアントIDのファイルを使ってログイン用のトークンを取得してファイル保存する
+// saveTokenFileWithCredentialFile(CREDENTIAL_PATH, TOKEN_PATH);
+
+// トークンを取得してファイル保存済みの状態で、Gmailログインしてラベルの一覧を表示する
+listLabelsWithLogin(CREDENTIAL_PATH, TOKEN_PATH);
