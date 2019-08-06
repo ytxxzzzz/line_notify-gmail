@@ -1,10 +1,13 @@
 
-import {google} from 'googleapis'
+import {google, gmail_v1, cloudkms_v1} from 'googleapis'
+import {KeyManagementServiceClient} from '@google-cloud/kms';
+import { OAuth2Client } from 'google-auth-library';
 import * as fs from 'fs';
 import * as readline from 'readline';
 import {promisify} from 'util';
+import { MethodOptions } from 'googleapis-common';
 
-const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly'
+const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
 const TOKEN_PATH = 'token.json';
 const CREDENTIAL_PATH = 'client_id.json';
 
@@ -54,6 +57,19 @@ export async function saveTokenFileWithCredentialFile(credentialFilePath: string
   });
 }
 
+async function cryptByKms(data: string) {
+  const client = new KeyManagementServiceClient();
+  const name = client.cryptoKeyPath(
+    process.env.gcp_project!,
+    process.env.gcp_location!,
+    "line-notify",
+    "gmail-line-notify"
+  );
+  const [result] = await client.encrypt({name, plaintext: data});
+  console.log(result.ciphertext.toString('base64'));
+}
+
+
 async function getOAuth2ClientFromCredentialFile(credentialFilePath: string) {
   const credentialContent = await promisify(fs.readFile)(credentialFilePath);
   const credentials = JSON.parse(credentialContent.toString());
@@ -64,7 +80,7 @@ async function getOAuth2ClientFromCredentialFile(credentialFilePath: string) {
   );
 }
 
-function listLabels(auth: any) {
+function listLabels(auth: OAuth2Client) {
     const gmail = google.gmail({version: 'v1', auth});
     gmail.users.labels.list({
       userId: 'me',
@@ -96,4 +112,6 @@ const testMessage = {
 // saveTokenFileWithCredentialFile(CREDENTIAL_PATH, TOKEN_PATH);
 
 // トークンを取得してファイル保存済みの状態で、Gmailログインしてラベルの一覧を表示する
-listLabelsWithLogin(CREDENTIAL_PATH, TOKEN_PATH);
+//listLabelsWithLogin(CREDENTIAL_PATH, TOKEN_PATH);
+
+cryptByKms("az");

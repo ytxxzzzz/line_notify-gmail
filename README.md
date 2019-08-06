@@ -13,6 +13,12 @@
 - kms
   - https://www.apps-gcp.com/kms-with-functions/
 
+- kms暗号化の際のgcloud ログイン
+  - `gcloud auth login`だけだと、OAuthで許可したクレデンシャルを一部のサービスでは使ってくれないみたい→今回だとkmsの暗号化には使ってくれず。`GOOGLE_APPLICATION_CREDENTIALS`を設定しろというエラーが出た。
+  - 代わりに`gcloud auth application-default login`で行くと使われる。
+
+- kms 暗号化、復号の参考
+  - https://cloud.google.com/kms/docs/encrypt-decrypt?hl=ja
 
 # トラブルシュート
 - VSCodeのデバッガにて、readlineの入力でReferenceErrorが発生して、標準入力ができない
