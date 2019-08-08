@@ -57,7 +57,7 @@ export async function saveTokenFileWithCredentialFile(credentialFilePath: string
   });
 }
 
-async function cryptByKms(data: string) {
+async function encryptByKms(data: string) {
   const client = new KeyManagementServiceClient();
   const name = client.cryptoKeyPath(
     process.env.gcp_project!,
@@ -65,8 +65,26 @@ async function cryptByKms(data: string) {
     "line-notify",
     "gmail-line-notify"
   );
-  const [result] = await client.encrypt({name, plaintext: data});
-  console.log(result.ciphertext.toString('base64'));
+  const [result] = await client.encrypt({name, plaintext: Buffer.from(data).toString('base64')});
+  const encryptedBase64 = result.ciphertext.toString('base64');
+  console.log("encrypted base64 string:");
+  console.log(encryptedBase64);
+
+  return encryptedBase64;
+}
+
+async function decryptByKms(encryptedBase64: string) {
+  const client = new KeyManagementServiceClient();
+  const name = client.cryptoKeyPath(
+    process.env.gcp_project!,
+    process.env.gcp_location!,
+    "line-notify",
+    "gmail-line-notify"
+  );
+  const [result] = await client.decrypt({name, ciphertext: encryptedBase64});
+  const decrypted = result.plaintext.toString();
+  console.log("decrypted plaintext:");
+  console.log(decrypted);
 }
 
 
@@ -113,5 +131,9 @@ const testMessage = {
 
 // トークンを取得してファイル保存済みの状態で、Gmailログインしてラベルの一覧を表示する
 //listLabelsWithLogin(CREDENTIAL_PATH, TOKEN_PATH);
+async function aaa() {
+  const encryptedBase64 = await encryptByKms("azzzzzzzzzzzz");
+  decryptByKms(encryptedBase64);
+};
 
-cryptByKms("az");
+aaa();
