@@ -4,3 +4,4 @@ node_modules/
 client_id.json
 token.json
 index.js.map
+.env

@@ -6,6 +6,9 @@ import * as fs from 'fs';
 import * as readline from 'readline';
 import {promisify} from 'util';
 import { MethodOptions } from 'googleapis-common';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
 
 const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
 const TOKEN_PATH = 'token.json';
@@ -62,8 +65,8 @@ async function encryptByKms(data: string) {
   const name = client.cryptoKeyPath(
     process.env.gcp_project!,
     process.env.gcp_location!,
-    "line-notify",
-    "gmail-line-notify"
+    process.env.gcp_kms_key_ring!,
+    process.env.gcp_kms_key!
   );
   const [result] = await client.encrypt({name, plaintext: Buffer.from(data).toString('base64')});
   const encryptedBase64 = result.ciphertext.toString('base64');
