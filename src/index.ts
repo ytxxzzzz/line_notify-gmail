@@ -14,6 +14,39 @@ const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
 const TOKEN_PATH = 'token.json';
 const CREDENTIAL_PATH = 'client_id.json';
 
+///////////////////////////////////////// 公開関数 ////////////////////////////////////////////////////
+export async function encryptByKms(data: string) {
+  const client = new KeyManagementServiceClient();
+  const name = client.cryptoKeyPath(
+    process.env.gcp_project!,
+    process.env.gcp_location!,
+    process.env.gcp_kms_key_ring!,
+    process.env.gcp_kms_key!
+  );
+  const [result] = await client.encrypt({name, plaintext: Buffer.from(data).toString('base64')});
+  const encryptedBase64 = result.ciphertext.toString('base64');
+//  console.log("encrypted base64 string:");
+//  console.log(encryptedBase64);
+  return encryptedBase64;
+}
+
+export async function decryptByKms(encryptedBase64: string) {
+  const client = new KeyManagementServiceClient();
+  const name = client.cryptoKeyPath(
+    process.env.gcp_project!,
+    process.env.gcp_location!,
+    "line-notify",
+    "gmail-line-notify"
+  );
+  const [result] = await client.decrypt({name, ciphertext: encryptedBase64});
+  const decrypted = result.plaintext.toString();
+//  console.log("decrypted plaintext:");
+//  console.log(decrypted);
+  return decrypted;
+}
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+//////////////////////// Cloud Functions エントリポイント関数 ////////////////////////////////////
 /**
  * Triggered from a message on a Cloud Pub/Sub topic.
  *
@@ -27,6 +60,7 @@ export async function helloPubSub(event: any, context: any) {
     console.log(`pubsubMsg=${pubsubMsg}`);
 
 }
+////////////////////////////////////////////////////////////////////////////////////////////////
 
 export async function listLabelsWithLogin(credentialFilePath: string, tokenFilePath: string) {
   const oAuth2Client = await getOAuth2ClientFromCredentialFile(credentialFilePath);
@@ -59,37 +93,6 @@ export async function saveTokenFileWithCredentialFile(credentialFilePath: string
     });
   });
 }
-
-async function encryptByKms(data: string) {
-  const client = new KeyManagementServiceClient();
-  const name = client.cryptoKeyPath(
-    process.env.gcp_project!,
-    process.env.gcp_location!,
-    process.env.gcp_kms_key_ring!,
-    process.env.gcp_kms_key!
-  );
-  const [result] = await client.encrypt({name, plaintext: Buffer.from(data).toString('base64')});
-  const encryptedBase64 = result.ciphertext.toString('base64');
-  console.log("encrypted base64 string:");
-  console.log(encryptedBase64);
-
-  return encryptedBase64;
-}
-
-async function decryptByKms(encryptedBase64: string) {
-  const client = new KeyManagementServiceClient();
-  const name = client.cryptoKeyPath(
-    process.env.gcp_project!,
-    process.env.gcp_location!,
-    "line-notify",
-    "gmail-line-notify"
-  );
-  const [result] = await client.decrypt({name, ciphertext: encryptedBase64});
-  const decrypted = result.plaintext.toString();
-  console.log("decrypted plaintext:");
-  console.log(decrypted);
-}
-
 
 async function getOAuth2ClientFromCredentialFile(credentialFilePath: string) {
   const credentialContent = await promisify(fs.readFile)(credentialFilePath);

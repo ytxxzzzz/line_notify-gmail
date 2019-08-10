@@ -3,5 +3,5 @@ node_modules/
 .vscode/
 client_id.json
 token.json
-index.js.map
+*.js.map
 .env
