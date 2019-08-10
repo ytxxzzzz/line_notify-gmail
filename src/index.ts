@@ -15,37 +15,47 @@ const TOKEN_PATH = 'token.json';
 const CREDENTIAL_PATH = 'client_id.json';
 
 ///////////////////////////////////////// 公開関数 ////////////////////////////////////////////////////
+/**
+ * gcpのKMSで暗号化する
+ * @param  {string} data 暗号化対象の文字列→バイナリの場合BASE64とかで文字列にして利用してくださいな
+ * @return {string} KMSで暗号化されBASE64エンコーディングされた文字列
+ */
 export async function encryptByKms(data: string) {
-  const client = new KeyManagementServiceClient();
-  const name = client.cryptoKeyPath(
-    process.env.gcp_project!,
-    process.env.gcp_location!,
-    process.env.gcp_kms_key_ring!,
-    process.env.gcp_kms_key!
-  );
+  const [client, name] = getKmsClientAndKeyName();
   const [result] = await client.encrypt({name, plaintext: Buffer.from(data).toString('base64')});
   const encryptedBase64 = result.ciphertext.toString('base64');
 //  console.log("encrypted base64 string:");
 //  console.log(encryptedBase64);
   return encryptedBase64;
 }
-
+/**
+ * gcpのKMSで復号する
+ * @param  {string} encryptedBase64 KMS暗号化してBASE64エンコードされた文字列
+ * @return {string} 復号された文字列
+ */
 export async function decryptByKms(encryptedBase64: string) {
-  const client = new KeyManagementServiceClient();
-  const name = client.cryptoKeyPath(
-    process.env.gcp_project!,
-    process.env.gcp_location!,
-    "line-notify",
-    "gmail-line-notify"
-  );
+  const [client, name] = getKmsClientAndKeyName();
   const [result] = await client.decrypt({name, ciphertext: encryptedBase64});
   const decrypted = result.plaintext.toString();
 //  console.log("decrypted plaintext:");
 //  console.log(decrypted);
   return decrypted;
 }
-////////////////////////////////////////////////////////////////////////////////////////////////
-
+/**
+ * KMSのクライアントと利用する鍵の名前を取得する。
+ * 名前の各情報は、環境変数に格納されているので、設定が必要
+ * @returns {[KeyManagementServiceClient, string]} クライアントと鍵の名前
+ */
+function getKmsClientAndKeyName(): [KeyManagementServiceClient, string] {
+  const client = new KeyManagementServiceClient();
+  const name = client.cryptoKeyPath(
+    process.env.gcp_project!,
+    process.env.gcp_location!,
+    process.env.gcp_kms_key_ring!,
+    process.env.gcp_kms_key!,
+  );
+  return [client, name];
+}
 //////////////////////// Cloud Functions エントリポイント関数 ////////////////////////////////////
 /**
  * Triggered from a message on a Cloud Pub/Sub topic.
@@ -62,7 +72,7 @@ export async function helloPubSub(event: any, context: any) {
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
-export async function listLabelsWithLogin(credentialFilePath: string, tokenFilePath: string) {
+async function listLabelsWithLogin(credentialFilePath: string, tokenFilePath: string) {
   const oAuth2Client = await getOAuth2ClientFromCredentialFile(credentialFilePath);
   const token = await promisify(fs.readFile)(tokenFilePath);
   oAuth2Client.setCredentials(JSON.parse(token.toString()));
@@ -128,18 +138,7 @@ const testMessage = {
     "@type":"type.googleapis.com/google.pubsub.v1.PubsubMessage",
     "attributes":null,
     "data":"eyJlbWFpbEFkZHJlc3MiOiJmcmVzaC5icmFzaC5zYXJhcmlpbWFuQGdtYWlsLmNvbSIsImhpc3RvcnlJZCI6MjAyODAzN30="
-}
-
-
-
-// クライアントIDのファイルを使ってログイン用のトークンを取得してファイル保存する
-// saveTokenFileWithCredentialFile(CREDENTIAL_PATH, TOKEN_PATH);
-
-// トークンを取得してファイル保存済みの状態で、Gmailログインしてラベルの一覧を表示する
-//listLabelsWithLogin(CREDENTIAL_PATH, TOKEN_PATH);
-async function aaa() {
-  const encryptedBase64 = await encryptByKms("azzzzzzzzzzzz");
-  decryptByKms(encryptedBase64);
 };
 
-aaa();
+helloPubSub(testMessage, null);
+
