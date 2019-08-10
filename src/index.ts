@@ -64,10 +64,10 @@ function getKmsClientAndKeyName(): [KeyManagementServiceClient, string] {
  * @param {!Object} context Metadata for the event.
  */
 export async function helloPubSub(event: any, context: any) {
-    console.log(`event=${JSON.stringify(event)}`);
-    const pubsubMsgBase64 = event.data;
-    const pubsubMsg = Buffer.from(pubsubMsgBase64, 'base64').toString();
-    console.log(`pubsubMsg=${pubsubMsg}`);
+  console.log(`event=${JSON.stringify(event)}`);
+  const pubsubMsgBase64 = event.data;
+  const pubsubMsg = Buffer.from(pubsubMsgBase64, 'base64').toString();
+  console.log(`pubsubMsg=${pubsubMsg}`);
 
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////
