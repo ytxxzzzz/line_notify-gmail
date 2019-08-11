@@ -15,6 +15,12 @@ const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
 const TOKEN_PATH = 'token.json';
 const CREDENTIAL_PATH = 'client_id.json';
 
+async function outputEncryptedCredential(credentialFilePath: string) {
+  const credentialContents = await promisify(fs.readFile)(credentialFilePath);
+  const encryptedCredential = await encryptByKms(credentialContents.toString());
+  console.log(`KMS暗号化済みクレデンシャル：${encryptedCredential}`);
+}
+
 async function outputTokenFromCredentialFileWithOAuthLogin(credentialFilePath: string) {
   const oAuth2Client = await getOAuth2ClientFromCredentialFile(credentialFilePath);
   const authUrl = oAuth2Client.generateAuthUrl({
@@ -49,4 +55,16 @@ async function getOAuth2ClientFromCredentialFile(credentialFilePath: string) {
   );
 }
 
-outputTokenFromCredentialFileWithOAuthLogin("client_id.json");
+/////////////////////////// main処理 //////////////////////////////////
+// クレデンシャルファイルとトークンをKMSで暗号化してBASE64エンコードした文字列を画面に出力する
+// トークン発行の際には、OAuth認証を行うため、ブラウザでGmailアクセスを許可したいアカウントで認証
+// を行う必要がある。プロンプトの指示通りやれば大丈夫なように作っているつもり
+const credentialPath = "client_id.json";
+(async () => {
+  console.log('******************************************************************************')
+  await outputEncryptedCredential(credentialPath);
+  console.log('******************************************************************************')
+  await outputTokenFromCredentialFileWithOAuthLogin(credentialPath);
+  console.log('******************************************************************************')
+})();
+///////////////////////////////////////////////////////////////////////
