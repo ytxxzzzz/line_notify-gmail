@@ -32,7 +32,8 @@ async function outputTokenFromCredentialFileWithOAuthLogin(credentialFilePath: s
     input: process.stdin,
     output: process.stdout,
   });
-  rl.question('↑に表示されたURLにアクセスして、GMail読み取り権限を付与したいGoogleアカウントを承認し、結果出力されたコードをここに入力してください: ', (code) => {
+  rl.question('↑に表示されたURLにアクセスして、GMail読み取り権限を付与したいGoogleアカウントを承認し、' +
+              '結果出力されたコードをここに入力してください: ', (code) => {
     rl.close();
     oAuth2Client.getToken(code, async (err, token: Credentials) => {
       if (err) {
@@ -61,10 +62,10 @@ async function getOAuth2ClientFromCredentialFile(credentialFilePath: string) {
 // を行う必要がある。プロンプトの指示通りやれば大丈夫なように作っているつもり
 const credentialPath = "client_id.json";
 (async () => {
-  console.log('******************************************************************************')
+  console.log('******************************************************************************************************')
   await outputEncryptedCredential(credentialPath);
-  console.log('******************************************************************************')
+  console.log('******************************************************************************************************')
   await outputTokenFromCredentialFileWithOAuthLogin(credentialPath);
-  console.log('******************************************************************************')
+  console.log('******************************************************************************************************')
 })();
 ///////////////////////////////////////////////////////////////////////

@@ -69,6 +69,17 @@ export async function helloPubSub(event: any, context: any) {
   const pubsubMsg = Buffer.from(pubsubMsgBase64, 'base64').toString();
   console.log(`pubsubMsg=${pubsubMsg}`);
 
+  const encryptedBase64Credential = process.env.gmail_credential_encrypted_base64!;
+  const encryptedBase64Token = process.env.gmail_token_encrypted_base64!;
+
+  const credentialJsonString = await decryptByKms(encryptedBase64Credential);
+  const tokenJsonString = await decryptByKms(encryptedBase64Token);
+
+  console.log('******************************************************************************************************')
+  console.log(`credential=${credentialJsonString}`);
+  console.log('******************************************************************************************************')
+  console.log(`token=${tokenJsonString}`);
+  console.log('******************************************************************************************************')
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
