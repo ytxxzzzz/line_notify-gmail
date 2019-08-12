@@ -68,6 +68,7 @@ export async function helloPubSub(event: any, context: any) {
   const pubsubMsgBase64 = event.data;
   const pubsubMsg = Buffer.from(pubsubMsgBase64, 'base64').toString();
   console.log(`pubsubMsg=${pubsubMsg}`);
+  const pubsubMsgObj = JSON.parse(pubsubMsg);
 
   const encryptedBase64Credential = process.env.gmail_credential_encrypted_base64!;
   const encryptedBase64Token = process.env.gmail_token_encrypted_base64!;
@@ -83,8 +84,8 @@ export async function helloPubSub(event: any, context: any) {
 
   // gmail認証
   const client = authGmail(credentialJsonString, tokenJsonString);
-
   listLabels(client);
+  await getMail(client, pubsubMsgObj.historyId);
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -105,6 +106,12 @@ function getOAuth2ClientFromCredentialFile(credentialJsonString: string) {
   return new google.auth.OAuth2(
     client_id, client_secret, redirect_uris[0]
   );
+}
+
+async function getMail(auth: OAuth2Client, historyId: string) {
+  const gmail = google.gmail({version: 'v1', auth});
+  const histories = gmail.users.history.list({userId: "me", startHistoryId: historyId});
+  console.log(histories);
 }
 
 function listLabels(auth: OAuth2Client) {
@@ -130,7 +137,7 @@ function listLabels(auth: OAuth2Client) {
 const testMessage = {
     "@type":"type.googleapis.com/google.pubsub.v1.PubsubMessage",
     "attributes":null,
-    "data":"eyJlbWFpbEFkZHJlc3MiOiJmcmVzaC5icmFzaC5zYXJhcmlpbWFuQGdtYWlsLmNvbSIsImhpc3RvcnlJZCI6MjAyODAzN30="
+    "data":process.env.test_pubsub_msg_base64
 };
 
 helloPubSub(testMessage, null);
