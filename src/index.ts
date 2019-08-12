@@ -80,44 +80,26 @@ export async function helloPubSub(event: any, context: any) {
   console.log('******************************************************************************************************')
   console.log(`token=${tokenJsonString}`);
   console.log('******************************************************************************************************')
+
+  // gmail認証
+  const client = authGmail(credentialJsonString, tokenJsonString);
+
+  listLabels(client);
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
-async function listLabelsWithLogin(credentialFilePath: string, tokenFilePath: string) {
-  const oAuth2Client = await getOAuth2ClientFromCredentialFile(credentialFilePath);
-  const token = await promisify(fs.readFile)(tokenFilePath);
-  oAuth2Client.setCredentials(JSON.parse(token.toString()));
-  listLabels(oAuth2Client);
+function authGmail(credentialJsonString: string, tokenJsonString: string) {
+  const oAuth2Client = getOAuth2ClientFromCredentialFile(credentialJsonString);
+  oAuth2Client.setCredentials(JSON.parse(tokenJsonString));
+  return oAuth2Client;
 }
 
-export async function saveTokenFileWithCredentialFile(credentialFilePath: string, tokenFilePath: string) {
-  const oAuth2Client = await getOAuth2ClientFromCredentialFile(credentialFilePath);
-  const authUrl = oAuth2Client.generateAuthUrl({
-    access_type: 'offline',
-    scope: SCOPES,
-  });
-  console.log('Authorize this app by visiting this url:', authUrl);
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-  rl.question('Enter the code from that page here: ', (code) => {
-    rl.close();
-    oAuth2Client.getToken(code, (err: any, token: any) => {
-      if (err) return console.error('Error retrieving access token', err);
-      oAuth2Client.setCredentials(token);
-      // Store the token to disk for later program executions
-      fs.writeFile(tokenFilePath, JSON.stringify(token), (err) => {
-        if (err) return console.error(err);
-        console.log('Token stored to', tokenFilePath);
-      });
-    });
-  });
-}
-
-async function getOAuth2ClientFromCredentialFile(credentialFilePath: string) {
-  const credentialContent = await promisify(fs.readFile)(credentialFilePath);
-  const credentials = JSON.parse(credentialContent.toString());
+/**
+ * CredentialのJson文字列からOAuth2Clientオブジェクトを取得する
+ * @param credentialJsonString CredentialのJson文字列
+ */
+function getOAuth2ClientFromCredentialFile(credentialJsonString: string) {
+  const credentials = JSON.parse(credentialJsonString);
 
   const {client_secret, client_id, redirect_uris} = credentials.installed;
   return new google.auth.OAuth2(
