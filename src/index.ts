@@ -110,8 +110,10 @@ function getOAuth2ClientFromCredentialFile(credentialJsonString: string) {
 
 async function getMail(auth: OAuth2Client, historyId: string) {
   const gmail = google.gmail({version: 'v1', auth});
-  const histories = gmail.users.history.list({userId: "me", startHistoryId: historyId});
-  console.log(histories);
+  const historyResponse = await gmail.users.history.list({userId: "me", startHistoryId: historyId});
+  const histories = historyResponse.data.history?historyResponse.data.history:[];
+  const messages = histories.map(history=>history.messages?history.messages:[]).reduce((a,b)=>a.concat(b));
+  console.log(messages);
 }
 
 function listLabels(auth: OAuth2Client) {
