@@ -24,8 +24,8 @@ export async function encryptByKms(data: string) {
   const [client, name] = getKmsClientAndKeyName();
   const [result] = await client.encrypt({name, plaintext: Buffer.from(data).toString('base64')});
   const encryptedBase64 = result.ciphertext.toString('base64');
-//  console.log("encrypted base64 string:");
-//  console.log(encryptedBase64);
+//  console.info("encrypted base64 string:");
+//  console.info(encryptedBase64);
   return encryptedBase64;
 }
 /**
@@ -37,8 +37,8 @@ export async function decryptByKms(encryptedBase64: string) {
   const [client, name] = getKmsClientAndKeyName();
   const [result] = await client.decrypt({name, ciphertext: encryptedBase64});
   const decrypted = result.plaintext.toString();
-//  console.log("decrypted plaintext:");
-//  console.log(decrypted);
+//  console.info("decrypted plaintext:");
+//  console.info(decrypted);
   return decrypted;
 }
 /**
@@ -64,34 +64,37 @@ function getKmsClientAndKeyName(): [KeyManagementServiceClient, string] {
  * @param {!Object} context Metadata for the event.
  */
 export async function helloPubSub(event: any, context: any) {
-  console.log(`event=${JSON.stringify(event)}`);
+  console.info(`event=${JSON.stringify(event)}`);
   const pubsubMsgBase64 = event.data;
   const pubsubMsg = Buffer.from(pubsubMsgBase64, 'base64').toString();
-  console.log(`pubsubMsg=${pubsubMsg}`);
+  console.info(`pubsubMsg=${pubsubMsg}`);
   const pubsubMsgObj = JSON.parse(pubsubMsg);
 
+  const {credentialObj, tokenObj} = await getAuthObj();
+
+  // gmail認証
+  const client = authGmail(credentialObj, tokenObj);
+  listLabels(client);
+  await getMail(client, pubsubMsgObj.historyId);
+}
+////////////////////////////////////////////////////////////////////////////////////////////////
+
+async function getAuthObj(): Promise<{credentialObj: any, tokenObj: any}> {
   const encryptedBase64Credential = process.env.gmail_credential_encrypted_base64!;
   const encryptedBase64Token = process.env.gmail_token_encrypted_base64!;
 
   const credentialJsonString = await decryptByKms(encryptedBase64Credential);
   const tokenJsonString = await decryptByKms(encryptedBase64Token);
 
-  console.log('******************************************************************************************************')
-  console.log(`credential=${credentialJsonString}`);
-  console.log('******************************************************************************************************')
-  console.log(`token=${tokenJsonString}`);
-  console.log('******************************************************************************************************')
-
-  // gmail認証
-  const client = authGmail(credentialJsonString, tokenJsonString);
-  listLabels(client);
-  await getMail(client, pubsubMsgObj.historyId);
+  return {
+    credentialObj: JSON.parse(credentialJsonString), 
+    tokenObj: JSON.parse(tokenJsonString)
+  };
 }
-////////////////////////////////////////////////////////////////////////////////////////////////
 
-function authGmail(credentialJsonString: string, tokenJsonString: string) {
-  const oAuth2Client = getOAuth2ClientFromCredentialFile(credentialJsonString);
-  oAuth2Client.setCredentials(JSON.parse(tokenJsonString));
+function authGmail(credentialObj: any, tokenObj: any) {
+  const oAuth2Client = getOAuth2ClientFromCredentialObj(credentialObj);
+  oAuth2Client.setCredentials(tokenObj);
   return oAuth2Client;
 }
 
@@ -99,10 +102,8 @@ function authGmail(credentialJsonString: string, tokenJsonString: string) {
  * CredentialのJson文字列からOAuth2Clientオブジェクトを取得する
  * @param credentialJsonString CredentialのJson文字列
  */
-function getOAuth2ClientFromCredentialFile(credentialJsonString: string) {
-  const credentials = JSON.parse(credentialJsonString);
-
-  const {client_secret, client_id, redirect_uris} = credentials.installed;
+function getOAuth2ClientFromCredentialObj(credentialObj: any) {
+  const {client_secret, client_id, redirect_uris} = credentialObj.installed;
   return new google.auth.OAuth2(
     client_id, client_secret, redirect_uris[0]
   );
@@ -110,10 +111,42 @@ function getOAuth2ClientFromCredentialFile(credentialJsonString: string) {
 
 async function getMail(auth: OAuth2Client, historyId: string) {
   const gmail = google.gmail({version: 'v1', auth});
-  const historyResponse = await gmail.users.history.list({userId: "me", startHistoryId: historyId});
-  const histories = historyResponse.data.history?historyResponse.data.history:[];
+  
+  let nextPageToken: string | undefined = "first";
+  let histories: gmail_v1.Schema$History[] = [];
+  // listAPIは１回で全取得できない場合、nextPageTokenにトークン返ってくる仕様なので繰り返し搾り取る
+  // listAPIの仕様は以下参照のこと
+  // https://developers.google.com/gmail/api/v1/reference/users/history/list?apix_params=%7B%22userId%22%3A%22me%22%2C%22startHistoryId%22%3A4723%7D
+  while(nextPageToken) {
+    const historyResponse = await gmail.users.history.list({userId: "me", startHistoryId: historyId});
+    const historiesPart = historyResponse.data.history?historyResponse.data.history:[];
+    histories = histories.concat(historiesPart);
+    nextPageToken = historyResponse.data.nextPageToken;
+  }
   const messages = histories.map(history=>history.messages?history.messages:[]).reduce((a,b)=>a.concat(b));
-  console.log(messages);
+  const messageIds = messages.map(message=>message.id);
+  console.info(`messageIds=[${messageIds.join(",")}]`);
+
+  const snippets = await Promise.all(messageIds.map(async id=>{
+    const message = await gmail.users.messages.get({id, userId: "me"});
+    return message.data.snippet;
+  }));
+  console.info(`snippets=[${snippets.join(",")}]`);
+}
+
+async function watchGmail(): Promise<gmail_v1.Schema$WatchResponse> {
+  const {credentialObj, tokenObj} = await getAuthObj();
+
+  // gmail認証
+  const client = authGmail(credentialObj, tokenObj);
+  const gmail = google.gmail({version: 'v1', auth: client});
+
+  const request: gmail_v1.Schema$WatchRequest = {
+    labelIds: [process.env.gmail_watch_label!],
+    topicName: process.env.gmail_watch_pubsub_topic!,
+  };
+  const response = await gmail.users.watch({userId: "me", requestBody: request});
+  return response.data;
 }
 
 function listLabels(auth: OAuth2Client) {
@@ -122,16 +155,16 @@ function listLabels(auth: OAuth2Client) {
       userId: 'me',
     }, (err, res) => {
       if (err || !res || !res.data.labels) {
-        return console.log('The API returned an error: ' + err);
+        return console.info('The API returned an error: ' + err);
       } 
       const labels = res.data.labels;
       if (labels.length) {
-        console.log('Labels:');
+        console.info('Labels:');
         labels.forEach((label) => {
-          console.log(`- ${label.name}`);
+          console.info(`- ${label.name}`);
         });
       } else {
-        console.log('No labels found.');
+        console.info('No labels found.');
       }
     });
   }
@@ -142,5 +175,9 @@ const testMessage = {
     "data":process.env.test_pubsub_msg_base64
 };
 
-helloPubSub(testMessage, null);
+//helloPubSub(testMessage, null);
 
+(async ()=> {
+  const res = await watchGmail();
+  console.info(`historyId=${res.historyId}`);
+})();
