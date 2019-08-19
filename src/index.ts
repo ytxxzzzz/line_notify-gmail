@@ -41,20 +41,12 @@ export async function decryptByKms(encryptedBase64: string) {
 //  console.info(decrypted);
   return decrypted;
 }
-/**
- * KMSのクライアントと利用する鍵の名前を取得する。
- * 名前の各情報は、環境変数に格納されているので、設定が必要
- * @returns {[KeyManagementServiceClient, string]} クライアントと鍵の名前
- */
-function getKmsClientAndKeyName(): [KeyManagementServiceClient, string] {
-  const client = new KeyManagementServiceClient();
-  const name = client.cryptoKeyPath(
-    process.env.gcp_project!,
-    process.env.gcp_location!,
-    process.env.gcp_kms_key_ring!,
-    process.env.gcp_kms_key!,
-  );
-  return [client, name];
+
+export async function authGmail() {
+  const {credentialObj, tokenObj} = await getAuthObj();
+  const oAuth2Client = getOAuth2ClientFromCredentialObj(credentialObj);
+  oAuth2Client.setCredentials(tokenObj);
+  return oAuth2Client;
 }
 //////////////////////// Cloud Functions エントリポイント関数 ////////////////////////////////////
 /**
@@ -70,10 +62,9 @@ export async function helloPubSub(event: any, context: any) {
   console.info(`pubsubMsg=${pubsubMsg}`);
   const pubsubMsgObj = JSON.parse(pubsubMsg);
 
-  const {credentialObj, tokenObj} = await getAuthObj();
-
   // gmail認証
-  const client = authGmail(credentialObj, tokenObj);
+  const client = await authGmail();
+  // ラベル名とラベルIDをログ出力→Watch対象のラベル指定にはラベルに対応するIDを知る必要があるので
   listLabels(client);
   await getMail(client, pubsubMsgObj.historyId);
 }
@@ -92,12 +83,6 @@ async function getAuthObj(): Promise<{credentialObj: any, tokenObj: any}> {
   };
 }
 
-function authGmail(credentialObj: any, tokenObj: any) {
-  const oAuth2Client = getOAuth2ClientFromCredentialObj(credentialObj);
-  oAuth2Client.setCredentials(tokenObj);
-  return oAuth2Client;
-}
-
 /**
  * CredentialのJson文字列からOAuth2Clientオブジェクトを取得する
  * @param credentialJsonString CredentialのJson文字列
@@ -107,6 +92,22 @@ function getOAuth2ClientFromCredentialObj(credentialObj: any) {
   return new google.auth.OAuth2(
     client_id, client_secret, redirect_uris[0]
   );
+}
+
+/**
+ * KMSのクライアントと利用する鍵の名前を取得する。
+ * 名前の各情報は、環境変数に格納されているので、設定が必要
+ * @returns {[KeyManagementServiceClient, string]} クライアントと鍵の名前
+ */
+function getKmsClientAndKeyName(): [KeyManagementServiceClient, string] {
+  const client = new KeyManagementServiceClient();
+  const name = client.cryptoKeyPath(
+    process.env.gcp_project!,
+    process.env.gcp_location!,
+    process.env.gcp_kms_key_ring!,
+    process.env.gcp_kms_key!,
+  );
+  return [client, name];
 }
 
 async function getMail(auth: OAuth2Client, historyId: string) {
@@ -132,21 +133,6 @@ async function getMail(auth: OAuth2Client, historyId: string) {
     return message.data.snippet;
   }));
   console.info(`snippets=[${snippets.join(",")}]`);
-}
-
-async function watchGmail(): Promise<gmail_v1.Schema$WatchResponse> {
-  const {credentialObj, tokenObj} = await getAuthObj();
-
-  // gmail認証
-  const client = authGmail(credentialObj, tokenObj);
-  const gmail = google.gmail({version: 'v1', auth: client});
-
-  const request: gmail_v1.Schema$WatchRequest = {
-    labelIds: [process.env.gmail_watch_label!],
-    topicName: process.env.gmail_watch_pubsub_topic!,
-  };
-  const response = await gmail.users.watch({userId: "me", requestBody: request});
-  return response.data;
 }
 
 function listLabels(auth: OAuth2Client) {
@@ -176,8 +162,3 @@ const testMessage = {
 };
 
 //helloPubSub(testMessage, null);
-
-(async ()=> {
-  const res = await watchGmail();
-  console.info(`historyId=${res.historyId}`);
-})();
