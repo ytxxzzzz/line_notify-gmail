@@ -26,3 +26,9 @@
   - https://qiita.com/link_to_someone/items/2b7cb8747a34165b8c8e
   - ※このサイトにはコンソールを`externalTerminal`にせよ、とのことだったが、その値にしたらX関係風のエラーが出たので代わりに`integratedTerminal`としてみたところ、
   普通にVSCode下のターミナルに出力されたので、こっちのほうがいいかも
+
+# Cloud Functions　デプロイコマンドの例
+まだ環境変数設定が書けていないが、それ以外は大丈夫そう
+```
+gcloud functions deploy watch-gmail --trigger-resource gmail-notify-topic --trigger-event google.pubsub.topic.publish --stage-bucket ytxxzzzz-cloud-functions --entry-point watchGmailHandler --runtime nodejs8
+```

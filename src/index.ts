@@ -50,12 +50,13 @@ export async function authGmail() {
 }
 //////////////////////// Cloud Functions エントリポイント関数 ////////////////////////////////////
 /**
- * Triggered from a message on a Cloud Pub/Sub topic.
+ * Gmail通知用のCloudFunctionsイベントハンドラ
+ * これはGmailWatchからのPubSub通知で起動される想定
  *
- * @param {!Object} event Event payload.
+ * @param {!Object} event Pub/Sub Event payload.
  * @param {!Object} context Metadata for the event.
  */
-export async function helloPubSub(event: any, context: any) {
+export async function notifyGmailHandler(event: any, context: any) {
   console.info(`event=${JSON.stringify(event)}`);
   const pubsubMsgBase64 = event.data;
   const pubsubMsg = Buffer.from(pubsubMsgBase64, 'base64').toString();
@@ -67,6 +68,23 @@ export async function helloPubSub(event: any, context: any) {
   // ラベル名とラベルIDをログ出力→Watch対象のラベル指定にはラベルに対応するIDを知る必要があるので
   listLabels(client);
   await getMail(client, pubsubMsgObj.historyId);
+}
+
+/**
+ * GmailWatchAPI実行用のCloudFunctionsイベントハンドラ
+ * １週間に１回程度実行する必要があるらしい。そうしないとメール監視がストップするみたい。
+ * CloudSchedulerからPubSub経由で実行される想定
+ *
+ * @param {!Object} event Pub/Sub Event payload.
+ * @param {!Object} context Metadata for the event.
+ */
+export async function watchGmailHandler(event: any, context: any) {
+  // gmail認証
+  const client = await authGmail();
+  // ラベル名とラベルIDをログ出力→Watch対象のラベル指定にはラベルに対応するIDを知る必要があるので
+  listLabels(client);
+  // gmailのwatch
+  await watchGmail();
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -135,30 +153,61 @@ async function getMail(auth: OAuth2Client, historyId: string) {
   console.info(`snippets=[${snippets.join(",")}]`);
 }
 
-function listLabels(auth: OAuth2Client) {
-    const gmail = google.gmail({version: 'v1', auth});
-    gmail.users.labels.list({
-      userId: 'me',
-    }, (err, res) => {
-      if (err || !res || !res.data.labels) {
-        return console.info('The API returned an error: ' + err);
-      } 
-      const labels = res.data.labels;
-      if (labels.length) {
-        console.info('Labels:');
-        labels.forEach((label) => {
-          console.info(`- ${label.name}`);
-        });
-      } else {
-        console.info('No labels found.');
-      }
-    });
-  }
+async function watchGmail(): Promise<gmail_v1.Schema$WatchResponse> {
+  // gmail認証
+  const client = await authGmail();
 
+  // ラベル名とラベルIDをログ出力→Watch対象のラベル指定にはラベルに対応するIDを知る必要があるので
+  listLabels(client);
+
+  const gmail = google.gmail({version: 'v1', auth: client});
+
+  const request: gmail_v1.Schema$WatchRequest = {
+    labelIds: [process.env.gmail_watch_label!],
+    topicName: process.env.gmail_watch_pubsub_topic!,
+  };
+  const response = await gmail.users.watch({userId: "me", requestBody: request});
+  return response.data;
+}
+
+// Gmailのラベルを全てログ出力する
+function listLabels(auth: OAuth2Client) {
+  const gmail = google.gmail({version: 'v1', auth});
+  gmail.users.labels.list({
+    userId: 'me',
+  }, (err, res) => {
+    if (err || !res || !res.data.labels) {
+      return console.info('The API returned an error: ' + err);
+    } 
+    const labels = res.data.labels;
+    if (labels.length) {
+      console.info('Labels:');
+      labels.forEach((label) => {
+        console.info(`- name="${label.name}", id="${label.id}"`);
+      });
+    } else {
+      console.info('No labels found.');
+    }
+  });
+}
+  
+
+
+////////////// notify gmail test code /////////////////
+/*
 const testMessage = {
     "@type":"type.googleapis.com/google.pubsub.v1.PubsubMessage",
     "attributes":null,
     "data":process.env.test_pubsub_msg_base64
 };
 
-//helloPubSub(testMessage, null);
+helloPubSub(testMessage, null);
+/*
+////////////// watch gmail test code /////////////////
+/*
+(async ()=> {
+  const res = await watchGmail();
+  console.info(`historyId=${res.historyId}`);
+})();
+*/
+///////////////////////////////////////////////////////
