@@ -29,6 +29,12 @@
 
 # Cloud Functions　デプロイコマンドの例
 まだ環境変数設定が書けていないが、それ以外は大丈夫そう
+## Gmailをwatchする関数
 ```
-gcloud functions deploy watch-gmail --trigger-resource gmail-notify-topic --trigger-event google.pubsub.topic.publish --stage-bucket ytxxzzzz-cloud-functions --entry-point watchGmailHandler --runtime nodejs8
+gcloud functions deploy watch-gmail --trigger-resource watch-gmail-scheduler-topic --trigger-event google.pubsub.topic.publish --stage-bucket ytxxzzzz-cloud-functions --entry-point watchGmailHandler --runtime nodejs8
+```
+
+## Gmailでメール受信したら、Line通知する関数
+```
+gcloud functions deploy notify-gmail --trigger-resource gmail-notify-topic --trigger-event google.pubsub.topic.publish --stage-bucket ytxxzzzz-cloud-functions --entry-point notifyGmailHandler --runtime nodejs8
 ```

@@ -84,7 +84,8 @@ export async function watchGmailHandler(event: any, context: any) {
   // ラベル名とラベルIDをログ出力→Watch対象のラベル指定にはラベルに対応するIDを知る必要があるので
   listLabels(client);
   // gmailのwatch
-  await watchGmail();
+  const res = await watchGmail();
+  console.info(`gmail watch result: historyId=${res.historyId}, expiration=${res.expiration}`);
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////
 

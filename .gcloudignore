@@ -24,4 +24,7 @@ tsconfig.json
 client_id.json
 token.json
 *.js.map
-.env
+
+# CloudFunctionでも.envに書かれた環境変数を利用するため、
+# デプロイパッケージに入れるようにするからコメントアウト
+# .env
