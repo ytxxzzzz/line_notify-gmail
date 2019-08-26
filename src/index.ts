@@ -1,6 +1,7 @@
 
 import {google, gmail_v1, cloudkms_v1} from 'googleapis'
 import {KeyManagementServiceClient} from '@google-cloud/kms';
+import {Storage} from '@google-cloud/storage';
 import { OAuth2Client } from 'google-auth-library';
 import * as fs from 'fs';
 import * as readline from 'readline';
@@ -191,8 +192,14 @@ function listLabels(auth: OAuth2Client) {
     }
   });
 }
-  
 
+// GCSへファイルを保存する
+function saveToStorage() {
+  const storage = new Storage();
+  const bucket = storage.bucket("bucket_name");
+  const file = bucket.file("aaa.txt");
+//  file.save()
+}
 
 ////////////// notify gmail test code /////////////////
 /*

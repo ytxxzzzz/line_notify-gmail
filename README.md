@@ -1,3 +1,22 @@
+# 概要
+本リポジトリは、以下の２つのCloudFunctionsと、ローカルPCでの実行を想定した１つのツールを格納する。
+- Cloud Functions
+  - Gmailをwatch(監視)する関数
+    - GmailのWatchAPIにて、Gmailの特定ラベルに来たメールを監視する
+    - WatchAPIは、メールが来たらGCPのPubSubへメッセージを送信する仕様
+    - また、WatchAPIのレスポンスにはWatchした時点のGmailのhistoryIdが格納されている
+    - そのhistoryIdをGCSへ保存する
+  - Gmailでメール受信したら、Line通知する関数
+    - PubSubで受けたメッセージを処理する関数
+    - メッセージには、メール受信した時点のGmailのhistoryIdが格納されている
+    - Watchした時点のhistoryIdと受信時にPubSubメッセージから取得したhistoryIdの間のメールが受信したメールということになる。
+    - そのメールを特定し、本文をLine通知する。
+- ツール
+  - GSuiteのクレデンシャルとトークンをKMSで暗号化＆BASE64エンコードし、コンソールに出力するツール
+    - コンソールに出力された暗号化済みBASE64文字列を `.env` に保存することで、CloudFunctionの２つがクレデンシャルを取得して動作する仕組みとなっている。
+    - ツール実行の際に、OAuth認証のためにWebブラウザを利用する動きとなることに注意。
+    - ツールが動作すると、コンソールにURLが表示されるので、そのURLにアクセスし、指示通りにGoogleアカウントでログインするとOAuth認証完了となり、暗号化BASE64化済みトークンが取得できる。
+
 # 環境構築
 - credentialを作成する
   - GCPで`APIs & Services`-`Credentials`の画面を開く
