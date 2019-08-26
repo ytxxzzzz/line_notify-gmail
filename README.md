@@ -17,6 +17,16 @@
     - ツール実行の際に、OAuth認証のためにWebブラウザを利用する動きとなることに注意。
     - ツールが動作すると、コンソールにURLが表示されるので、そのURLにアクセスし、指示通りにGoogleアカウントでログインするとOAuth認証完了となり、暗号化BASE64化済みトークンが取得できる。
 
+## GmailAPIの参考情報
+- WatchAPIを利用してGMail監視するQiita記事
+  - https://qiita.com/asamas/items/c0cc2c44a80a52c788be#fn2
+  - https://qiita.com/1ulce/items/672ae85d8c23bd9c478e
+- ただし、これら２つはWatchAPIの核心には至っていない模様。
+- 記事にあるが、PubSubに来るhistoryIdのメールをそのまま見ても空振りするので値を60引い他値でメールを検索するなどの荒技となっている。
+- ネットを漁っていたら、以下の情報がありこちらが正しそう。
+  - https://codeday.me/jp/qa/20190317/377709.html
+- 現在、この情報の信憑性を調べ中。
+
 # 環境構築
 - credentialを作成する
   - GCPで`APIs & Services`-`Credentials`の画面を開く
