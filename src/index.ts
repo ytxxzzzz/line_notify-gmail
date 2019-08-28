@@ -51,6 +51,25 @@ export async function authGmail() {
 }
 //////////////////////// Cloud Functions エントリポイント関数 ////////////////////////////////////
 /**
+ * GmailWatchAPI実行用のCloudFunctionsイベントハンドラ
+ * １週間に１回程度実行する必要があるらしい。そうしないとメール監視がストップするみたい。
+ * CloudSchedulerからPubSub経由で実行される想定
+ *
+ * @param {!Object} event Pub/Sub Event payload.
+ * @param {!Object} context Metadata for the event.
+ */
+export async function watchGmailHandler(event: any, context: any) {
+  // gmail認証
+  const client = await authGmail();
+  // ラベル名とラベルIDをログ出力→Watch対象のラベル指定にはラベルに対応するIDを知る必要があるので
+  listLabels(client);
+  // gmailのwatch
+  const res = await watchGmail();
+  console.info(`gmail watch result: historyId=${res.historyId}, expiration=${res.expiration}`);
+  saveToStorage(process.env.history_id_bucket!, process.env.history_id_filekey!, new Buffer(res.historyId!, "ascii"));
+}
+
+/**
  * Gmail通知用のCloudFunctionsイベントハンドラ
  * これはGmailWatchからのPubSub通知で起動される想定
  *
@@ -69,24 +88,6 @@ export async function notifyGmailHandler(event: any, context: any) {
   // ラベル名とラベルIDをログ出力→Watch対象のラベル指定にはラベルに対応するIDを知る必要があるので
   listLabels(client);
   await getMail(client, pubsubMsgObj.historyId);
-}
-
-/**
- * GmailWatchAPI実行用のCloudFunctionsイベントハンドラ
- * １週間に１回程度実行する必要があるらしい。そうしないとメール監視がストップするみたい。
- * CloudSchedulerからPubSub経由で実行される想定
- *
- * @param {!Object} event Pub/Sub Event payload.
- * @param {!Object} context Metadata for the event.
- */
-export async function watchGmailHandler(event: any, context: any) {
-  // gmail認証
-  const client = await authGmail();
-  // ラベル名とラベルIDをログ出力→Watch対象のラベル指定にはラベルに対応するIDを知る必要があるので
-  listLabels(client);
-  // gmailのwatch
-  const res = await watchGmail();
-  console.info(`gmail watch result: historyId=${res.historyId}, expiration=${res.expiration}`);
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -194,11 +195,11 @@ function listLabels(auth: OAuth2Client) {
 }
 
 // GCSへファイルを保存する
-function saveToStorage() {
+function saveToStorage(bucketName: string, fileKey: string, data: Buffer) {
   const storage = new Storage();
-  const bucket = storage.bucket("bucket_name");
-  const file = bucket.file("aaa.txt");
-//  file.save()
+  const bucket = storage.bucket(bucketName);
+  const file = bucket.file(fileKey);
+  file.save(data);
 }
 
 ////////////// notify gmail test code /////////////////
@@ -210,12 +211,11 @@ const testMessage = {
 };
 
 helloPubSub(testMessage, null);
-/*
+*/
 ////////////// watch gmail test code /////////////////
 /*
 (async ()=> {
-  const res = await watchGmail();
-  console.info(`historyId=${res.historyId}`);
+  const res = await watchGmailHandler({}, {});
 })();
 */
 ///////////////////////////////////////////////////////
