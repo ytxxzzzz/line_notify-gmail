@@ -67,6 +67,8 @@ export async function watchGmailHandler(event: any, context: any) {
   const res = await watchGmail();
   console.info(`gmail watch result: historyId=${res.historyId}, expiration=${res.expiration}`);
   saveToStorage(process.env.history_id_bucket!, process.env.history_id_filekey!, new Buffer(res.historyId!, "ascii"));
+  const data = await readFromStorage(process.env.history_id_bucket!, process.env.history_id_filekey!);
+  console.info(data.toString());
 }
 
 /**
@@ -194,12 +196,20 @@ function listLabels(auth: OAuth2Client) {
   });
 }
 
+const storage = new Storage();
+
 // GCSへファイルを保存する
 function saveToStorage(bucketName: string, fileKey: string, data: Buffer) {
-  const storage = new Storage();
   const bucket = storage.bucket(bucketName);
   const file = bucket.file(fileKey);
   file.save(data);
+}
+
+async function readFromStorage(bucketName: string, fileKey: string) {
+  const bucket = storage.bucket(bucketName);
+  const file = bucket.file(fileKey);
+  const buffer = await file.download();
+  return buffer;
 }
 
 ////////////// notify gmail test code /////////////////
@@ -213,9 +223,9 @@ const testMessage = {
 helloPubSub(testMessage, null);
 */
 ////////////// watch gmail test code /////////////////
-/*
+
 (async ()=> {
   const res = await watchGmailHandler({}, {});
 })();
-*/
+
 ///////////////////////////////////////////////////////
