@@ -67,8 +67,6 @@ export async function watchGmailHandler(event: any, context: any) {
   const res = await watchGmail();
   console.info(`gmail watch result: historyId=${res.historyId}, expiration=${res.expiration}`);
   saveToStorage(process.env.history_id_bucket!, process.env.history_id_filekey!, new Buffer(res.historyId!, "ascii"));
-  const data = await readFromStorage(process.env.history_id_bucket!, process.env.history_id_filekey!);
-  console.info(data.toString());
 }
 
 /**
@@ -85,11 +83,14 @@ export async function notifyGmailHandler(event: any, context: any) {
   console.info(`pubsubMsg=${pubsubMsg}`);
   const pubsubMsgObj = JSON.parse(pubsubMsg);
 
+  // GCSに保存した、前回動作時の最新historyIdを取得する
+  const lastHistoryId = (await readFromStorage(process.env.history_id_bucket!, process.env.history_id_filekey!)).toString();
+
   // gmail認証
   const client = await authGmail();
   // ラベル名とラベルIDをログ出力→Watch対象のラベル指定にはラベルに対応するIDを知る必要があるので
   listLabels(client);
-  await getMail(client, pubsubMsgObj.historyId);
+  await getMail(client, lastHistoryId, pubsubMsgObj.historyId);
 }
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -133,19 +134,27 @@ function getKmsClientAndKeyName(): [KeyManagementServiceClient, string] {
   return [client, name];
 }
 
-async function getMail(auth: OAuth2Client, historyId: string) {
+async function getMail(auth: OAuth2Client, previousHistoryId: string, newestHistoryId: string) {
   const gmail = google.gmail({version: 'v1', auth});
   
-  let nextPageToken: string | undefined = "first";
+  const FIRST_PAGE_TOKEN = "first_dummy_token";
+  let pageToken: string | undefined = FIRST_PAGE_TOKEN;
   let histories: gmail_v1.Schema$History[] = [];
   // listAPIは１回で全取得できない場合、nextPageTokenにトークン返ってくる仕様なので繰り返し搾り取る
   // listAPIの仕様は以下参照のこと
   // https://developers.google.com/gmail/api/v1/reference/users/history/list?apix_params=%7B%22userId%22%3A%22me%22%2C%22startHistoryId%22%3A4723%7D
-  while(nextPageToken) {
-    const historyResponse = await gmail.users.history.list({userId: "me", startHistoryId: historyId});
-    const historiesPart = historyResponse.data.history?historyResponse.data.history:[];
+  while(pageToken) {
+    const historyListRequest: gmail_v1.Params$Resource$Users$History$List = {
+      userId: "me",
+      historyTypes: ["messageAdded"],
+      labelId: process.env.gmail_watch_label!,
+      startHistoryId: previousHistoryId,
+      pageToken: (pageToken===FIRST_PAGE_TOKEN)?undefined:pageToken,
+    };
+    const historyResponse = await gmail.users.history.list(historyListRequest);
+    const historiesPart = historyResponse.data.history ? historyResponse.data.history : [];
     histories = histories.concat(historiesPart);
-    nextPageToken = historyResponse.data.nextPageToken;
+    pageToken = historyResponse.data.nextPageToken;
   }
   const messages = histories.map(history=>history.messages?history.messages:[]).reduce((a,b)=>a.concat(b));
   const messageIds = messages.map(message=>message.id);
@@ -153,9 +162,10 @@ async function getMail(auth: OAuth2Client, historyId: string) {
 
   const snippets = await Promise.all(messageIds.map(async id=>{
     const message = await gmail.users.messages.get({id, userId: "me"});
+    console.info(`snippet=${message.data.snippet}`);
+    console.info(`response=${JSON.stringify(message.data, null, " ")}`)
     return message.data.snippet;
   }));
-  console.info(`snippets=[${snippets.join(",")}]`);
 }
 
 async function watchGmail(): Promise<gmail_v1.Schema$WatchResponse> {
@@ -220,12 +230,12 @@ const testMessage = {
     "data":process.env.test_pubsub_msg_base64
 };
 
-helloPubSub(testMessage, null);
+notifyGmailHandler(testMessage, null);
 */
 ////////////// watch gmail test code /////////////////
-
+/*
 (async ()=> {
   const res = await watchGmailHandler({}, {});
 })();
-
+*/
 ///////////////////////////////////////////////////////

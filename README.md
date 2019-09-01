@@ -56,7 +56,7 @@
   - ※このサイトにはコンソールを`externalTerminal`にせよ、とのことだったが、その値にしたらX関係風のエラーが出たので代わりに`integratedTerminal`としてみたところ、
   普通にVSCode下のターミナルに出力されたので、こっちのほうがいいかも
 
-# Cloud Functions　デプロイコマンドの例
+# Cloud Functions　CLIデプロイの例
 まだ環境変数設定が書けていないが、それ以外は大丈夫そう
 ## Gmailをwatchする関数
 ```
@@ -67,3 +67,7 @@ gcloud functions deploy watch-gmail --trigger-resource watch-gmail-scheduler-top
 ```
 gcloud functions deploy notify-gmail --trigger-resource gmail-notify-topic --trigger-event google.pubsub.topic.publish --stage-bucket ytxxzzzz-cloud-functions --entry-point notifyGmailHandler --runtime nodejs8
 ```
+
+# 参考
+- nodejsのGCSライブラリリファレンス
+https://googleapis.dev/nodejs/storage/latest/File.html#download
